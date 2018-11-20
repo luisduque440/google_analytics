@@ -1,11 +1,8 @@
 --- to do ---
 FILE data_wrangling.py is critical:
 - Test this file carefully on sanity_checks_data_wrangling.ipynb
-- Include all the relevant periods in create_features(df) (i.e [1,2,3,4,5,6])
-- Carefull with features being dropped/dtypes changed in fill_empty_values()
 - Do label_encodings_object_dtypes in a better way, turn them into ordinals.
-- Not very relevant: change the line object_column_names df.select_dtypes(include='object'))
 - Figure out what the actual target is (totals_totalTransactionRevenue?)
-- Remove some lines of code in get_fixed_fields(df)
 - Review carefully get_cummulate_numeric_fields(df, start_date, end_date, suffix='')... document with a picture
-  
+- create_features(df)  for more months
+- evaluate the model
