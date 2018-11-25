@@ -8,6 +8,16 @@ from sklearn.metrics import recall_score
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import average_precision_score
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import mean_squared_error
+
+
+def evaluate_model(y_true, y_predicted):
+    y_all_zeros = [0]*len(y_true)
+    rmse = np.sqrt(mean_squared_error(y_true, y_predicted))
+    benchmark_rmse = np.sqrt(mean_squared_error(y_true, y_all_zeros))
+    improvement = 100*(rmse-benchmark_rmse)/benchmark_rmse
+    return rmse, benchmark_rmse, improvement
+
 
 
 def plot_roc_curve(y_true, y_predicted_probability, title=""):

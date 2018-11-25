@@ -25,12 +25,10 @@ def get_training_data_from_visits(df):
 
     all_training_periods = []
     while(first_train_day + timedelta(days=275) <= last_train_day):  ## 276 days is around 9months
-        all_training_periods.append(get_training_data_in_a_period(df , first_train_day = first_train_day))
-        first_train_day = first_train_day + timedelta(days=28) ## 4weeks = 1 month
+        training_data = get_training_data_in_a_period(df , first_train_day)
+        all_training_periods.append(training_data.reset_index())
+        first_train_day = first_train_day + timedelta(days=28)
     return pd.concat(all_training_periods, ignore_index=True)
-
-
-    
 
 def get_training_data_in_a_period(df , first_train_day):
     """ 
@@ -68,7 +66,7 @@ def create_features(df):
 
     feature_dfs.append(get_fixed_fields(df)) 
 
-    for i in [1,3,6]:
+    for i in [1,3,4,6]:
         start = last_day - timedelta(days=i*28)
         end = last_day
         feature_dfs.append(get_cummulate_numeric_fields(df, start, end, suffix="_last_%s_months" %(i)))
@@ -141,7 +139,7 @@ def get_target(train_period, test_period):
     """
     target = pd.DataFrame(index=train_period.fullVisitorId.unique())
     target.index.name = 'fullVisitorId'
-    target['total_spent'] = test_period.groupby('fullVisitorId')['totals_totalTransactionRevenue'].agg(np.sum)
+    target['total_spent'] = test_period.groupby('fullVisitorId')['totals_transactionRevenue'].agg(np.sum)
     target = target.fillna(0)
     target['target']= target.total_spent.apply(lambda x: np.log(x+1))
     target=target.drop(columns=['total_spent'])
@@ -191,7 +189,7 @@ def fill_empty_values(df):
     df = df.drop(columns = ['visitStartTime', 'visitId'])
     df = df.fillna(0)
     df['visits'] = 1.0 
-    df['paying_visits'] = (df.totals_totalTransactionRevenue>0).apply(float)
+    df['paying_visits'] = (df.totals_transactionRevenue>0).apply(float)
     return df
 
 
