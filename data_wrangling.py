@@ -25,9 +25,11 @@ def get_training_data_from_visits(df):
 
     all_training_periods = []
     while(first_train_day + timedelta(days=275) <= last_train_day):  ## 276 days is around 9months
+        print first_train_day
         training_data = get_training_data_in_a_period(df , first_train_day)
         all_training_periods.append(training_data.reset_index())
         first_train_day = first_train_day + timedelta(days=28)
+    print "len(all_training_periods)", len(all_training_periods)
     return pd.concat(all_training_periods, ignore_index=True)
 
 def get_training_data_in_a_period(df , first_train_day):
@@ -50,6 +52,7 @@ def get_training_data_in_a_period(df , first_train_day):
     y = get_target(train_period, test_period)
     X = create_features(train_period)
     X['target']=y.target
+    X['month']=y.month
     return X
 
 def create_features(df):
@@ -118,7 +121,7 @@ def get_fixed_fields(df, suffix=''):
     result = pd.DataFrame(index=df.fullVisitorId.unique())
     result.index.name= 'fullVisitorId'
     
-    grouped_df = df.groupby('fullVisitorId')
+    grouped_df = df.sort_values(by=['date']).groupby('fullVisitorId')
     for col in object_column_names:
         result[col+suffix] = grouped_df[col].last()
     return result
@@ -142,8 +145,10 @@ def get_target(train_period, test_period):
     target['total_spent'] = test_period.groupby('fullVisitorId')['totals_transactionRevenue'].agg(np.sum)
     target = target.fillna(0)
     target['target']= target.total_spent.apply(lambda x: np.log(x+1))
-    target=target.drop(columns=['total_spent'])
-    return target
+    target['month']= str(test_period.date.min().month)
+
+    return target.drop(columns=['total_spent'])
+    #target['month']=df.date.apply(lambda x: str(x.month))
 
 def label_encode_object_dtypes(encoder_trainer, df_to_encode):
     """Label encodes all the columns of a DataFrames df1 and df2 that have
