@@ -1,8 +1,0 @@
---- to do ---
-FILE data_wrangling.py is critical:
-- Test this file carefully on sanity_checks_data_wrangling.ipynb
-- Do label_encodings_object_dtypes in a better way, turn them into ordinals.
-- Figure out what the actual target is (totals_totalTransactionRevenue?)
-- Review carefully get_cummulate_numeric_fields(df, start_date, end_date, suffix='')... document with a picture
-- create_features(df)  for more months
-- evaluate the model

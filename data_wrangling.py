@@ -7,10 +7,11 @@ import pandas as pd
 import json
 from pandas.io.json import json_normalize
 from sklearn import preprocessing
+from sklearn.base import BaseEstimator, TransformerMixin  
 
 
 def get_training_data_from_visits(df):
-    """ 
+    """ Notice that 276 days is around 9months (our training+testing period)
 
     Args:
         df: 
@@ -21,15 +22,13 @@ def get_training_data_from_visits(df):
     """
 
     first_train_day = df.date.min()
-    last_train_day = df.date.max()
+    last_train_day = df.date.max() + timedelta(days=1) 
 
     all_training_periods = []
-    while(first_train_day + timedelta(days=275) <= last_train_day):  ## 276 days is around 9months
-        print first_train_day
+    while(first_train_day + timedelta(days=276) <= last_train_day):  
         training_data = get_training_data_in_a_period(df , first_train_day)
         all_training_periods.append(training_data.reset_index())
         first_train_day = first_train_day + timedelta(days=28)
-    print "len(all_training_periods)", len(all_training_periods)
     return pd.concat(all_training_periods, ignore_index=True)
 
 def get_training_data_in_a_period(df , first_train_day):
@@ -52,7 +51,6 @@ def get_training_data_in_a_period(df , first_train_day):
     y = get_target(train_period, test_period)
     X = create_features(train_period)
     X['target']=y.target
-    X['month']=y.month
     return X
 
 def create_features(df):
@@ -64,7 +62,7 @@ def create_features(df):
     Returns:
         DataFrame: one row for each fullVisitorId in df
     """
-    last_day = df.date.max()
+    last_day = df.date.max() 
     feature_dfs=[]
 
     feature_dfs.append(get_fixed_fields(df)) 
@@ -148,9 +146,10 @@ def get_target(train_period, test_period):
     target['month']= str(test_period.date.min().month)
 
     return target.drop(columns=['total_spent'])
-    #target['month']=df.date.apply(lambda x: str(x.month))
 
-def label_encode_object_dtypes(encoder_trainer, df_to_encode):
+
+
+class CategoricalEncoder(TransformerMixin):  
     """Label encodes all the columns of a DataFrames df1 and df2 that have
        dtype='object'
  
@@ -160,17 +159,21 @@ def label_encode_object_dtypes(encoder_trainer, df_to_encode):
     Returns:
         DataFrame: df with object types encoded.
     """
-    object_column_names = df_to_encode.select_dtypes(include='object').columns  
-    encoded = df_to_encode.copy()
-    for col in object_column_names:
-        importance = encoder_trainer.groupby(col)['target'].agg([np.sum, np.size])
-        bayes_dictionary = importance['sum']/(importance['size']+1)
-        encoded[col] = encoded[col].apply(lambda x: bayes_dictionary[x] if x in bayes_dictionary.index else 0)
-    return encoded
-
-
-
-
+    def fit(self, X, y=None):
+        self.categorical_columns = list(X.select_dtypes(include='object').columns)
+        self.categorical_columns.remove('fullVisitorId')
+        self.level_dictionary={}
+        for col in self.categorical_columns:
+            importance = X.groupby(col)['totals_transactionRevenue'].agg([np.sum, np.size])
+            self.level_dictionary[col] = 1.0*importance['sum']/(importance['size']+1) 
+        return self
+    
+    def transform(self, X):
+        df=X.copy()
+        dictionary = self.level_dictionary
+        for col in self.categorical_columns:
+            df[col] = df[col].apply(lambda x: dictionary[col][x] if x in dictionary[col].index else 0)
+        return df
 
 
 def fill_empty_values(df):
@@ -191,6 +194,7 @@ def fill_empty_values(df):
         df[col] = df[col].astype('float64')
 
     df['date'] = pd.to_datetime(df.visitStartTime, unit='s').astype('datetime64')
+    df['date'] = df.date.apply(lambda x: dt.datetime(x.year, x.month, x.day))
     df = df.drop(columns = ['visitStartTime', 'visitId'])
     df = df.fillna(0)
     df['visits'] = 1.0 
@@ -221,4 +225,9 @@ def get_basic_info(df):
         'types': [df[col].apply(type).value_counts().to_dict() for col in colnames]
     })
     return Info.set_index('column_name')
+
+
+def get_visits_from_time_period(df, start_date, end_date):
+    dg=df.copy()
+    return dg[(dg.date >= start_date) & (dg.date<end_date)]
 
