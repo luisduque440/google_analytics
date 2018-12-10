@@ -45,8 +45,9 @@ def get_training_data_in_a_period(df , first_train_day):
     first_test_day = last_train_day + timedelta(days=46)
     last_test_day = first_test_day + timedelta(days=62)
 
-    train_period = df[(df.date>= first_train_day) & (df.date<last_train_day)]
-    test_period = df[(df.date>=first_test_day) & (df.date<last_test_day)]
+    
+    train_period = restrict_df_to_time_period(df, first_train_day, last_train_day)
+    test_period = restrict_df_to_time_period(df, first_test_day, last_test_day)
 
     y = get_target(train_period, test_period)
     X = create_features(train_period)
@@ -94,7 +95,8 @@ def get_cummulate_numeric_fields(df, start_date, end_date, suffix=''):
     numeric_column_names = df.select_dtypes(include='float64').columns
     result = pd.DataFrame(index=df.fullVisitorId.unique())
     result.index.name= 'fullVisitorId'
-    relevant_df = df[(df.date>= start_date)& (df.date<=end_date)]
+    
+    relevant_df = restrict_df_to_time_period(df, start_date, end_date)
     
     grouped_df = relevant_df.groupby('fullVisitorId')
     for col in numeric_column_names:
@@ -125,39 +127,44 @@ def get_fixed_fields(df, suffix=''):
     return result
 
 
-def get_target(train_period, test_period):
+def get_target(train_visits_df, test_visits_df, target_name='totals_transactionRevenue'):
     """gets the target.
  
     Args:
-        train_period: DataFrame. Each row is a visit in the past
-        test_period: DataFrame. Each row is a visit in the future
+        train_visits_df: DataFrame. Each row is a visit in the past
+        test_visits_df: DataFrame. Each row is a visit in the future
 
  
     Returns:
-        DataFrame: one row for each fullVisitorId in train_visit and
+        DataFrame: one row for each fullVisitorId in train_visits_df and
             one column (log_total_spent) with the natural log 
-            of the sum of all transactions in test_period dataframe
+            of the sum of all transactions in test_visits_df dataframe
     """
-    target = pd.DataFrame(index=train_period.fullVisitorId.unique())
+    target = pd.DataFrame(index=train_visits_df.fullVisitorId.unique())
     target.index.name = 'fullVisitorId'
-    target['total_spent'] = test_period.groupby('fullVisitorId')['totals_transactionRevenue'].agg(np.sum)
+    target['total_spent'] = test_visits_df.groupby('fullVisitorId')[target_name].agg(np.sum)
     target = target.fillna(0)
     target['target']= target.total_spent.apply(lambda x: np.log(x+1))
-    target['month']= str(test_period.date.min().month)
-
+    target['month']= str(test_visits_df.date.min().month)
     return target.drop(columns=['total_spent'])
 
 
-
 class CategoricalEncoder(TransformerMixin):  
-    """Label encodes all the columns of a DataFrames df1 and df2 that have
-       dtype='object'
+    """Label encodes all the columns of a dataframe.
  
     Args:
         df
         
     Returns:
-        DataFrame: df with object types encoded.
+        DataFrame with object dtypes label-encoded. Notice that this is not just a
+        typical Label Encoder. For each categorical column in the data frame, the levels
+        are encoded proporcional to how much transaction revenue they generate. 
+        
+        For example, as 
+        (avg spent in USA) > (avg spent in Great Britain) > (avg spent spent in Argentina)
+        the encoded labels of USA, Great Britain and Argentina are expected to preserve 
+        the same order
+        
     """
     def fit(self, X, y=None):
         self.categorical_columns = list(X.select_dtypes(include='object').columns)
@@ -182,7 +189,7 @@ def fill_empty_values(df):
         df1
         
     Returns:
-        DataFrame: df1 with filled empty values and columns types formated
+        DataFrame: df with filled empty values and columns types formated
     """
     
     object_column_names = df.select_dtypes(include='object').columns 
@@ -204,13 +211,14 @@ def fill_empty_values(df):
 
 
 def get_basic_info(df):
-    """gets basic information from a data frame
+    """gets basic information from a data frame, used just for exploratory purposes and
+       to evaluate the quality (i.e. range, number of empty values, dtypes, ...) of the dataframe
  
     Args:
         df
         
     Returns:
-        A dataframe that has one row for each column in df1 and 5 columns:
+        A dataframe that has one row for each column in df and 5 columns:
         unique_elements(the number of unique values), 'mode' (most common element), 
         'empty_values' (number of empty values), 'dtype', 'types' (python types
         contained in that column)
@@ -227,7 +235,7 @@ def get_basic_info(df):
     return Info.set_index('column_name')
 
 
-def get_visits_from_time_period(df, start_date, end_date):
+def restrict_df_to_time_period(df, start_date, end_date):
     dg=df.copy()
     return dg[(dg.date >= start_date) & (dg.date<end_date)]
 
